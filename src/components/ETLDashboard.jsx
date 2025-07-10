@@ -20,9 +20,14 @@ import {
   Memory,
   Storage,
   Functions,
-  Download
+  Download,
+  ExpandMore,
+  ExpandLess,
+  Flight,
+  Upload
 } from '@mui/icons-material';
 import { nodesData, availableProcesses as processesData } from '../data/nodesData';
+import NodeDetailsModal from './NodeDetailsModal';
 
 const ETLDashboard = () => {
   const [allNodes, setAllNodes] = useState(nodesData);
@@ -33,9 +38,18 @@ const ETLDashboard = () => {
   const [isLayouting, setIsLayouting] = useState(false);
   const [draggedNode, setDraggedNode] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(0.5);
+  const [zoom, setZoom] = useState(0.8);
   const [pan, setPan] = useState({ x: 100, y: 50 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [expandedLevels, setExpandedLevels] = useState({ 'Ingesta': false, 'Transformación': false, 'Business': false });
   const svgRef = useRef(null);
+
+  const toggleLevel = (level) => {
+    setExpandedLevels(prev => ({ ...prev, [level]: !prev[level] }));
+  };
 
   useEffect(() => {
     setNodes(nodesData);
@@ -51,6 +65,17 @@ const ETLDashboard = () => {
       };
     }
   }, [draggedNode, dragOffset, pan, zoom]);
+
+  useEffect(() => {
+    if (isPanning) {
+      document.addEventListener('mousemove', handleCanvasMouseMove);
+      document.addEventListener('mouseup', handleCanvasMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleCanvasMouseMove);
+        document.removeEventListener('mouseup', handleCanvasMouseUp);
+      };
+    }
+  }, [isPanning, panStart]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -113,6 +138,11 @@ const ETLDashboard = () => {
     });
   };
 
+  const handleDoubleClick = (node) => {
+    setSelectedNode(node);
+    setModalOpen(true);
+  };
+
   const handleMouseMove = (e) => {
     if (!draggedNode) return;
     const rect = svgRef.current.getBoundingClientRect();
@@ -145,6 +175,23 @@ const ETLDashboard = () => {
     }));
     
     setZoom(newZoom);
+  };
+
+  const handleCanvasMouseDown = (e) => {
+    if (e.target === svgRef.current || e.target.tagName === 'rect') {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    }
+  };
+
+  const handleCanvasMouseMove = (e) => {
+    if (isPanning) {
+      setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+    }
+  };
+
+  const handleCanvasMouseUp = () => {
+    setIsPanning(false);
   };
 
 
@@ -193,11 +240,12 @@ const ETLDashboard = () => {
       <Paper 
         elevation={0} 
         sx={{ 
-          background: 'linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%)',
-          color: 'white',
+          bgcolor: '#ffffff',
+          color: '#0f172a',
           p: 2,
           borderRadius: 0,
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+          borderBottom: '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
         }}
       >
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -206,15 +254,14 @@ const ETLDashboard = () => {
               width: 32, 
               height: 32, 
               borderRadius: 1, 
-              bgcolor: 'rgba(255,255,255,0.2)', 
+              bgcolor: '#3b82f6', 
               display: 'flex', 
               alignItems: 'center', 
-              justifyContent: 'center',
-              fontSize: '16px'
+              justifyContent: 'center'
             }}>
-              🚀
+              <Flight sx={{ color: 'white', fontSize: 20 }} />
             </Box>
-            DAG Process Monitor
+            Volaris Process Monitor
           </Typography>
 
           <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
@@ -223,14 +270,14 @@ const ETLDashboard = () => {
               display: 'flex', 
               alignItems: 'center', 
               gap: 0.5, 
-              bgcolor: 'rgba(34, 197, 94, 0.15)', 
+              bgcolor: '#dcfce7', 
               px: 1.5, 
               py: 0.5, 
               borderRadius: 1,
-              border: '1px solid rgba(34, 197, 94, 0.3)'
+              border: '1px solid #22c55e'
             }}>
-              <CheckCircle sx={{ color: '#22c55e', fontSize: 16 }} />
-              <Typography variant="caption" sx={{ color: 'white', fontWeight: 600 }}>
+              <CheckCircle sx={{ color: '#16a34a', fontSize: 16 }} />
+              <Typography variant="caption" sx={{ color: '#15803d', fontWeight: 600 }}>
                 {stats.success} Success
               </Typography>
             </Box>
@@ -238,14 +285,14 @@ const ETLDashboard = () => {
               display: 'flex', 
               alignItems: 'center', 
               gap: 0.5, 
-              bgcolor: 'rgba(245, 158, 11, 0.15)', 
+              bgcolor: '#fef3c7', 
               px: 1.5, 
               py: 0.5, 
               borderRadius: 1,
-              border: '1px solid rgba(245, 158, 11, 0.3)'
+              border: '1px solid #f59e0b'
             }}>
-              <PlayArrow sx={{ color: '#f59e0b', fontSize: 16 }} />
-              <Typography variant="caption" sx={{ color: 'white', fontWeight: 600 }}>
+              <PlayArrow sx={{ color: '#d97706', fontSize: 16 }} />
+              <Typography variant="caption" sx={{ color: '#92400e', fontWeight: 600 }}>
                 {stats.running} Running
               </Typography>
             </Box>
@@ -253,14 +300,14 @@ const ETLDashboard = () => {
               display: 'flex', 
               alignItems: 'center', 
               gap: 0.5, 
-              bgcolor: 'rgba(239, 68, 68, 0.15)', 
+              bgcolor: '#fee2e2', 
               px: 1.5, 
               py: 0.5, 
               borderRadius: 1,
-              border: '1px solid rgba(239, 68, 68, 0.3)'
+              border: '1px solid #ef4444'
             }}>
-              <Error sx={{ color: '#ef4444', fontSize: 16 }} />
-              <Typography variant="caption" sx={{ color: 'white', fontWeight: 600 }}>
+              <Error sx={{ color: '#dc2626', fontSize: 16 }} />
+              <Typography variant="caption" sx={{ color: '#991b1b', fontWeight: 600 }}>
                 {stats.failed} Failed
               </Typography>
             </Box>
@@ -268,20 +315,20 @@ const ETLDashboard = () => {
               display: 'flex', 
               alignItems: 'center', 
               gap: 0.5, 
-              bgcolor: 'rgba(148, 163, 184, 0.15)', 
+              bgcolor: '#f1f5f9', 
               px: 1.5, 
               py: 0.5, 
               borderRadius: 1,
-              border: '1px solid rgba(148, 163, 184, 0.3)'
+              border: '1px solid #94a3b8'
             }}>
-              <Schedule sx={{ color: '#94a3b8', fontSize: 16 }} />
-              <Typography variant="caption" sx={{ color: 'white', fontWeight: 600 }}>
+              <Schedule sx={{ color: '#64748b', fontSize: 16 }} />
+              <Typography variant="caption" sx={{ color: '#475569', fontWeight: 600 }}>
                 {stats.pending} Pending
               </Typography>
             </Box>
 
             <FormControl size="small" sx={{ minWidth: 160 }}>
-              <InputLabel sx={{ color: 'rgba(255,255,255,0.8)', '&.Mui-focused': { color: 'white' } }}>Filter</InputLabel>
+              <InputLabel sx={{ color: '#64748b', '&.Mui-focused': { color: '#3b82f6' } }}>Filter</InputLabel>
               <Select
                 value={activeFilter}
                 label="Filter"
@@ -290,12 +337,12 @@ const ETLDashboard = () => {
                   filterNodes(e.target.value);
                 }}
                 sx={{
-                  color: 'white',
-                  '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.6)' },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'white' },
-                  '.MuiSvgIcon-root': { color: 'white' },
-                  bgcolor: 'rgba(255,255,255,0.1)',
+                  color: '#0f172a',
+                  '.MuiOutlinedInput-notchedOutline': { borderColor: '#d1d5db' },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#9ca3af' },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#3b82f6' },
+                  '.MuiSvgIcon-root': { color: '#64748b' },
+                  bgcolor: '#ffffff',
                   borderRadius: 1,
                   height: 36
                 }}
@@ -311,8 +358,8 @@ const ETLDashboard = () => {
               variant="contained"
               startIcon={<Download />}
               sx={{
-                bgcolor: 'rgba(255,255,255,0.15)',
-                border: '1px solid rgba(255,255,255,0.2)',
+                bgcolor: '#3b82f6',
+                border: '1px solid #3b82f6',
                 color: 'white',
                 fontWeight: 500,
                 px: 2,
@@ -321,12 +368,47 @@ const ETLDashboard = () => {
                 textTransform: 'none',
                 height: 36,
                 '&:hover': {
-                  bgcolor: 'rgba(255,255,255,0.25)'
+                  bgcolor: '#2563eb'
                 },
                 transition: 'all 0.2s ease'
               }}
             >
               Template
+            </Button>
+
+            <Button
+              variant="contained"
+              component="label"
+              startIcon={<Upload />}
+              sx={{
+                bgcolor: '#10b981',
+                border: '1px solid #10b981',
+                color: 'white',
+                fontWeight: 500,
+                px: 2,
+                py: 0.5,
+                borderRadius: 1,
+                textTransform: 'none',
+                height: 36,
+                '&:hover': {
+                  bgcolor: '#059669'
+                },
+                transition: 'all 0.2s ease'
+              }}
+            >
+              Load Excel
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                hidden
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    console.log('Excel file selected:', file.name);
+                    // TODO: Implement Excel processing logic
+                  }
+                }}
+              />
             </Button>
 
             {activeFilter !== 'all' && (
@@ -407,14 +489,14 @@ const ETLDashboard = () => {
             component="svg"
             ref={svgRef}
             onWheel={handleWheel}
+            onMouseDown={handleCanvasMouseDown}
             sx={{
               width: '100%',
               height: '100%',
-              cursor: draggedNode ? 'grabbing' : 'grab'
+              cursor: isPanning ? 'grabbing' : draggedNode ? 'grabbing' : 'grab'
             }}
           >
             <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-            {/* Grid Background */}
             <defs>
               <pattern
                 id="grid"
@@ -443,35 +525,65 @@ const ETLDashboard = () => {
                 />
               </marker>
             </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
+            <rect width="100%" height="3000" fill="url(#grid)" />
 
             {/* Level Backgrounds */}
-            {['Ingesta', 'Transformación', 'Business'].map((level, index) => (
-              <rect
-                key={`level-${level}`}
-                x={30 + (index * 270)}
-                y={0}
-                width="260"
-                height="100%"
-                fill={getLevelColor(level)}
-                opacity="0.2"
-              />
-            ))}
+            <rect
+              x={30}
+              y={0}
+              width="320"
+              height="100%"
+              fill={getLevelColor('Ingesta')}
+              opacity="0.2"
+            />
+            <rect
+              x={350}
+              y={0}
+              width="530"
+              height="100%"
+              fill={getLevelColor('Transformación')}
+              opacity="0.2"
+            />
+            <rect
+              x={880}
+              y={0}
+              width="400"
+              height="100%"
+              fill={getLevelColor('Business')}
+              opacity="0.2"
+            />
 
             {/* Level Labels */}
-            {['Ingesta', 'Transformación', 'Business'].map((level, index) => (
-              <text
-                key={`level-label-${level}`}
-                x={50 + (index * 270) + 120}
-                y={30}
-                textAnchor="middle"
-                fontSize="16"
-                fontWeight="bold"
-                fill="#333"
-              >
-                {level.toUpperCase()}
-              </text>
-            ))}
+            <text
+              x={190}
+              y={30}
+              textAnchor="middle"
+              fontSize="16"
+              fontWeight="bold"
+              fill="#333"
+            >
+              INGESTA
+            </text>
+            <text
+              x={615}
+              y={30}
+              textAnchor="middle"
+              fontSize="16"
+              fontWeight="bold"
+              fill="#333"
+            >
+              TRANSFORMACIÓN
+            </text>
+            <text
+              x={1080}
+              y={30}
+              textAnchor="middle"
+              fontSize="16"
+              fontWeight="bold"
+              fill="#333"
+            >
+              BUSINESS
+            </text>
 
             {/* Connections */}
             {renderConnections()}
@@ -487,6 +599,7 @@ const ETLDashboard = () => {
               >
                 <Card
                   onMouseDown={(e) => handleMouseDown(e, node)}
+                  onDoubleClick={() => handleDoubleClick(node)}
                   sx={{
                     width: '100%',
                     height: '100%',
@@ -563,19 +676,25 @@ const ETLDashboard = () => {
         {/* Sidebar */}
         <Paper
           sx={{
-            width: sidebarCollapsed ? 48 : 400,
+            width: sidebarCollapsed ? 48 : 380,
             transition: 'width 0.3s ease',
             borderRadius: 0,
             display: 'flex',
             flexDirection: 'column',
-            bgcolor: '#ffffff',
-            borderLeft: '1px solid #e2e8f0',
-            boxShadow: '-4px 0 20px rgba(0,0,0,0.05)'
+            bgcolor: '#fafbfc',
+            borderLeft: '1px solid #e5e7eb'
           }}
         >
-          <Box sx={{ p: 2, borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ 
+            p: 3, 
+            borderBottom: '1px solid #e2e8f0',
+            bgcolor: '#f8fafc',
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center'
+          }}>
             {!sidebarCollapsed && (
-              <Typography variant="h6" fontWeight="bold">
+              <Typography variant="h6" fontWeight="700" color="#0f172a">
                 Control Panel
               </Typography>
             )}
@@ -583,7 +702,17 @@ const ETLDashboard = () => {
               variant="text" 
               size="small"
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              sx={{ minWidth: 'auto', px: 1 }}
+              sx={{ 
+                minWidth: 'auto', 
+                px: 1.5,
+                py: 0.5,
+                borderRadius: 2,
+                color: '#64748b',
+                '&:hover': {
+                  bgcolor: '#f1f5f9',
+                  color: '#0f172a'
+                }
+              }}
             >
               {sidebarCollapsed ? '→' : '←'}
             </Button>
@@ -592,78 +721,150 @@ const ETLDashboard = () => {
           {!sidebarCollapsed && (
             <Box sx={{ p: 2, overflow: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
               {/* Process Hierarchy */}
-              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                Process Hierarchy
-              </Typography>
-              <Box sx={{ mb: 3 }}>
+              <Box sx={{ mb: 4 }}>
+                <Typography variant="subtitle2" fontWeight="700" sx={{ mb: 3, color: '#0f172a', fontSize: '0.8rem' }}>
+                  Process Hierarchy
+                </Typography>
                 {['Ingesta', 'Transformación', 'Business'].map(level => {
                   const levelNodes = nodes.filter(n => n.level === level);
+                  const isExpanded = expandedLevels[level];
                   return (
-                    <Paper key={level} sx={{ p: 2, mb: 2, bgcolor: getLevelColor(level) }}>
-                      <Typography variant="subtitle2" fontWeight="bold">
-                        {level} ({levelNodes.length} processes)
-                      </Typography>
-                      {levelNodes.map(node => (
-                        <Box key={node.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
-                          <Typography variant="body2">{node.name}</Typography>
-                          <Chip
-                            label={node.status}
-                            color={getStatusColor(node.status)}
-                            size="small"
-                          />
+                    <Box key={level} sx={{ 
+                      mb: 2, 
+                      bgcolor: level === 'Ingesta' ? '#f0f9ff' : level === 'Transformación' ? '#fefbf3' : '#f0fdf4',
+                      border: `1px solid ${level === 'Ingesta' ? '#bae6fd' : level === 'Transformación' ? '#fed7aa' : '#bbf7d0'}`,
+                      borderRadius: 3,
+                      overflow: 'hidden'
+                    }}>
+                      <Box 
+                        onClick={() => toggleLevel(level)}
+                        sx={{ 
+                          p: 3, 
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          '&:hover': {
+                            bgcolor: '#f1f5f9'
+                          },
+                          transition: 'background-color 0.2s ease'
+                        }}
+                      >
+                        <Typography variant="body2" fontWeight="700" color="#0f172a">
+                          {level} ({levelNodes.length})
+                        </Typography>
+                        {isExpanded ? <ExpandLess color="action" /> : <ExpandMore color="action" />}
+                      </Box>
+                      {isExpanded && (
+                        <Box sx={{ px: 3, pb: 3 }}>
+                          {levelNodes.map(node => (
+                            <Box 
+                              key={node.id} 
+                              onClick={() => handleDoubleClick(node)}
+                              sx={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                alignItems: 'center', 
+                                py: 2.5,
+                                px: 3,
+                                mb: 1,
+                                bgcolor: '#ffffff',
+                                border: '1px solid #f1f5f9',
+                                borderRadius: 2,
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                cursor: 'pointer',
+                                '&:hover': {
+                                  bgcolor: '#f8fafc',
+                                  borderColor: '#e2e8f0',
+                                  transform: 'translateX(4px)'
+                                },
+                                transition: 'all 0.2s ease'
+                              }}>
+                              <Box>
+                                <Typography variant="body2" color="#0f172a" fontWeight="600" sx={{ mb: 0.5 }}>
+                                  {node.name}
+                                </Typography>
+                                <Typography variant="caption" color="#64748b" fontWeight="500">
+                                  {node.type} • {node.process}
+                                </Typography>
+                              </Box>
+                              <Chip
+                                label={node.status}
+                                color={getStatusColor(node.status)}
+                                size="small"
+                                variant="filled"
+                                sx={{ fontWeight: 600 }}
+                              />
+                            </Box>
+                          ))}
                         </Box>
-                      ))}
-                    </Paper>
+                      )}
+                    </Box>
                   );
                 })}
               </Box>
 
               {/* Critical Issues */}
-              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                Critical Issues
-              </Typography>
-              <Box sx={{ mb: 3 }}>
+              <Box sx={{ mb: 4 }}>
+                <Typography variant="subtitle2" fontWeight="700" sx={{ mb: 3, color: '#0f172a', fontSize: '0.8rem' }}>
+                  Critical Issues
+                </Typography>
                 {nodes.filter(n => n.status === 'FAILED').map(node => (
-                  <Paper key={node.id} sx={{ p: 2, mb: 1, bgcolor: '#ffebee', border: '1px solid #f44336' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Error color="error" />
-                      <Typography variant="body2" fontWeight="bold">
-                        {node.name} - FAILED
-                      </Typography>
-                    </Box>
-                    <Typography variant="caption" color="text.secondary">
-                      Process: {node.process} • Type: {node.type}
+                  <Box key={node.id} sx={{ 
+                    p: 3, 
+                    mb: 2, 
+                    bgcolor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: 3
+                  }}>
+                    <Typography variant="body2" fontWeight="700" color="#dc2626" sx={{ mb: 0.5 }}>
+                      {node.name}
                     </Typography>
-                  </Paper>
+                    <Typography variant="caption" color="#991b1b" fontWeight="500">
+                      {node.process} • {node.type}
+                    </Typography>
+                  </Box>
                 ))}
                 {nodes.filter(n => n.status === 'FAILED').length === 0 && (
-                  <Box sx={{ textAlign: 'center', py: 2 }}>
-                    <CheckCircle color="success" />
-                    <Typography variant="body2" color="text.secondary">
-                      No critical issues detected
+                  <Box sx={{ 
+                    p: 3, 
+                    textAlign: 'center',
+                    bgcolor: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: 3
+                  }}>
+                    <Typography variant="body2" color="#059669" fontWeight="600">
+                      No issues detected
                     </Typography>
                   </Box>
                 )}
               </Box>
 
               {/* Available Processes */}
-              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                Available Processes
-              </Typography>
               <Box>
+                <Typography variant="subtitle2" fontWeight="700" sx={{ mb: 3, color: '#0f172a', fontSize: '0.8rem' }}>
+                  Available Processes
+                </Typography>
                 {availableProcesses.map(process => {
                   const processNodes = allNodes.filter(n => n.process === process);
                   const isActive = activeFilter === process;
                   return (
-                    <Paper
+                    <Box
                       key={process}
                       sx={{
-                        p: 2,
-                        mb: 1,
+                        p: 3,
+                        mb: 2,
                         cursor: 'pointer',
-                        bgcolor: isActive ? '#e3f2fd' : 'white',
-                        border: isActive ? '1px solid #2196f3' : '1px solid #e0e0e0',
-                        '&:hover': { bgcolor: '#f5f5f5' }
+                        bgcolor: isActive ? '#eff6ff' : '#ffffff',
+                        border: isActive ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                        borderLeft: isActive ? '4px solid #3b82f6' : '4px solid transparent',
+                        borderRadius: 3,
+                        transition: 'all 0.2s ease',
+                        '&:hover': { 
+                          bgcolor: isActive ? '#eff6ff' : '#f1f5f9',
+                          borderColor: isActive ? '#3b82f6' : '#cbd5e1',
+                          borderLeft: '4px solid #94a3b8'
+                        }
                       }}
                       onClick={() => {
                         const newFilter = isActive ? 'all' : process;
@@ -671,13 +872,16 @@ const ETLDashboard = () => {
                         filterNodes(newFilter);
                       }}
                     >
-                      <Typography variant="body2" fontWeight="bold">
+                      <Typography variant="body2" fontWeight="700" sx={{ 
+                        color: isActive ? '#1e40af' : '#0f172a',
+                        mb: 0.5
+                      }}>
                         {process}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {processNodes.length} subprocesses
+                      <Typography variant="caption" color={isActive ? '#3b82f6' : '#64748b'} fontWeight="500">
+                        {processNodes.length} processes
                       </Typography>
-                    </Paper>
+                    </Box>
                   );
                 })}
               </Box>
@@ -686,6 +890,11 @@ const ETLDashboard = () => {
         </Paper>
       </Box>
 
+      <NodeDetailsModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        node={selectedNode}
+      />
 
     </Box>
   );
